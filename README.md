@@ -209,6 +209,20 @@ Basemap: **CARTO Dark Matter** (OpenStreetMap data). Attribution is shown on the
 
 ---
 
+## Version 1 (restore point)
+
+The Git tag **`v1.0.0`** marks **Version 1**: a snapshot of the whole repo at that commit. Your local `.env` and other ignored files are **not** part of Git; only tracked files roll back with the tag.
+
+| Goal | Command |
+|------|--------|
+| **Inspect** Version 1 (read-only) | `git switch --detach v1.0.0` |
+| **Branch off** Version 1 to work from it | `git switch -c my-branch-from-v1 v1.0.0` |
+| **Make `development` match Version 1** (discards later commits on that branch) | `git switch development` then `git reset --hard v1.0.0` — then `git push --force-with-lease origin development` only if you intend to rewrite remote history |
+
+After cloning on another machine, fetch tags: `git fetch --tags`, then use `v1.0.0` as above.
+
+---
+
 ## License
 
 No license file is included; add one if you distribute the project.
