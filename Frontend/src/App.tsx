@@ -31,7 +31,10 @@ const DARK_TILES =
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
 async function fetchLocation(name: string): Promise<LocationInfo> {
-  const r = await fetch(`/api/location?name=${encodeURIComponent(name)}`);
+  const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
+  const q = `?name=${encodeURIComponent(name)}`;
+  const url = base ? `${base}/location${q}` : `/api/location${q}`;
+  const r = await fetch(url);
   const j: unknown = await r.json();
   if (!r.ok) {
     const msg =
