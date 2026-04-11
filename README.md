@@ -1,39 +1,103 @@
+<div align="center">
+
 # Tourism Map Search
 
-A small full-stack demo: a **dark-themed map** (React, Leaflet) backed by **FastAPI**. Click a marker and the app calls the API, which uses **OpenAI** to return structured tourist-style facts for that place.
+**Explore the world on a dark map.** Tourist places come from **OpenStreetMap**; tap a pin and your **FastAPI + OpenAI** backend returns structured travel-style details.
+
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Leaflet](https://img.shields.io/badge/Leaflet-map-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/)
+
+</div>
 
 ---
 
-## Highlights
+## At a glance
 
-- **Map UI** — React 18, TypeScript, Vite, react-leaflet; CARTO dark basemap.
-- **API** — FastAPI `GET /location` with a typed JSON response (`Backend/main.py`).
-- **Local dev** — Vite proxies `/api/*` to the backend so the frontend keeps calling `/api/location` while FastAPI serves `/location`.
-- **Production-ready split** — Frontend on **Vercel**, API on **Render** (or any host), with env-driven CORS and API URL.
+| | |
+|:---|:---|
+| **Map** | React Leaflet, **CARTO Dark Matter** basemap (OSM). |
+| **Pins** | Loaded live from **Overpass API** (tourism tags in the current view). |
+| **Search** | **Photon** geocoder — place names & addresses; map flies to results (top-right panel). |
+| **You** | Optional **browser geolocation** for the initial center (HTTPS / localhost). |
+| **Details** | Click a marker → **`GET /location?name=…`** → OpenAI-structured JSON. |
+
+---
+
+## Feature highlights
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+  OSM data     ·  Debounced + cancellable Overpass requests
+  Geocode      ·  Same-origin proxy (Vite + Vercel) → no CORS pain
+  Resilience   ·  Bbox limits, retries & backoff on 429 / 504
+  UX           ·  Hover tooltips on pins; multi-result search list
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI[React app]
+  end
+  subgraph Vercel_or_dev["Vercel / Vite dev"]
+    P1["/api/overpass → Overpass"]
+    P2["/api/photon → Photon"]
+  end
+  subgraph External["Free OSM services"]
+    OV[(Overpass)]
+    PH[(Photon)]
+  end
+  subgraph Your_API["Your host e.g. Render"]
+    API[FastAPI /location]
+    OAI[(OpenAI)]
+  end
+  UI --> P1
+  UI --> P2
+  P1 --> OV
+  P2 --> PH
+  UI --> API
+  API --> OAI
+```
 
 ---
 
 ## Repository layout
 
-| Area | Stack | Role |
-|------|--------|------|
-| **Frontend** | React, TypeScript, Vite, Leaflet | Map, markers, popups, API calls |
-| **Backend** | FastAPI, OpenAI Python SDK | `GET /location` → JSON for a place name |
-| **Config** | Root `.env` (local only) | Secrets and local CORS; **not** committed |
+| Path | Role |
+|------|------|
+| `Backend/main.py` | FastAPI app, `GET /location` |
+| `Frontend/src/App.tsx` | Map, markers, geolocation, Overpass layer |
+| `Frontend/src/overpass.ts` | Overpass query, bbox checks, retries |
+| `Frontend/src/geocode.ts` + `MapSearch.tsx` | Photon geocoding + search UI |
+| `Frontend/vite.config.ts` | Dev proxies: `/api` → FastAPI, `/api/overpass`, `/api/photon` |
+| `Frontend/vercel.json` · root `vercel.json` | Vercel install + rewrites for Overpass & Photon |
+| `requirements.txt` | Python dependencies |
 
 ```
+Tourism_Map_Info_Search/
 ├── Backend/
-│   └── main.py              # FastAPI app
+│   └── main.py
 ├── Frontend/
-│   ├── src/                 # React app (see App.tsx for API base URL logic)
-│   ├── vite.config.ts       # Dev proxy: /api → http://127.0.0.1:8000
-│   ├── package.json
-│   ├── package-lock.json    # Commit this; used by npm ci on CI/Vercel
-│   └── vercel.json          # Used when Vercel “Root Directory” is Frontend
-├── requirements.txt         # Python deps for the API
-├── vercel.json              # Used when Vercel root is the repo root
-├── .vercelignore            # Skips Backend/.venv from Vercel uploads
-├── .gitignore               # .env, node_modules/, dist/, __pycache__/, etc.
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── MapSearch.tsx
+│   │   ├── geocode.ts
+│   │   ├── overpass.ts
+│   │   └── …
+│   ├── vite.config.ts
+│   ├── vercel.json
+│   └── package.json
+├── requirements.txt
+├── vercel.json
+├── .vercelignore
 └── README.md
 ```
 
@@ -43,46 +107,43 @@ A small full-stack demo: a **dark-themed map** (React, Leaflet) backed by **Fast
 
 - **Python** 3.11+ (3.10+ usually works)
 - **Node.js** 18+ and npm
-- An **OpenAI API key** for the model configured in `Backend/main.py` (e.g. `gpt-4o-mini`)
+- **OpenAI API key** (backend uses e.g. `gpt-4o-mini` in `Backend/main.py`)
 
 ---
 
 ## Environment variables
 
-### Local development (root `.env`)
-
-Create `.env` in the **repository root** (same level as `README.md`). The backend loads it on startup.
+### Backend — root `.env` (local)
 
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
-| `CORS_ORIGINS` | Yes* | Comma-separated browser origins allowed to call the API (no trailing slashes). Example: `http://localhost:5173,http://127.0.0.1:5173` |
+|----------|:--------:|-------------|
+| `OPENAI_API_KEY` | Yes | OpenAI API key |
+| `CORS_ORIGINS` | Yes* | Comma-separated origins, no trailing slashes. Example: `http://localhost:5173,http://127.0.0.1:5173` |
 
-\*If omitted, the list is empty and browsers will be blocked by CORS.
+\*If empty, browsers are blocked by CORS.
 
-Optional, for advanced setups:
+| Optional | Description |
+|----------|-------------|
+| `CORS_ORIGIN_REGEX` | e.g. `https://.*\.vercel\.app` for all `*.vercel.app` previews |
+
+### Render (or any API host)
+
+Same variables as above. Include every **real browser origin** (your Vercel URL, localhost if you test against prod).
+
+### Vercel (frontend build)
+
+`VITE_*` are baked in at **build time** — **redeploy** after changes.
 
 | Variable | Description |
 |----------|-------------|
-| `CORS_ORIGIN_REGEX` | Single regex (e.g. `https://.*\.vercel\.app`) to allow all matching Vercel preview/production hosts without listing each URL |
+| `VITE_API_BASE_URL` | Public API URL **without** trailing slash, e.g. `https://your-service.onrender.com`. If unset, the app uses `/api/...` (Vite proxy in dev only). |
 
-### Render (backend)
-
-Set in the service **Environment** tab (same names as above). Typical production combo:
-
-- `OPENAI_API_KEY`
-- `CORS_ORIGINS` — include every origin users actually open in the browser, e.g. `https://your-app.vercel.app,http://localhost:5173` if you still test locally against production API.
-- `CORS_ORIGIN_REGEX` (optional) — e.g. `https://.*\.vercel\.app` for all `*.vercel.app` hosts. Custom domains must still appear in `CORS_ORIGINS` (regex does not replace exact origins you use outside `*.vercel.app`).
-
-### Vercel (frontend)
-
-`VITE_*` variables are embedded at **build time**. After changing them, **redeploy** so a new build runs.
-
-| Variable | Description |
+| Optional | Description |
 |----------|-------------|
-| `VITE_API_BASE_URL` | Public URL of your API **without** a trailing slash, e.g. `https://your-service.onrender.com`. If unset, the app uses `/api/...` (local Vite proxy only). |
+| `VITE_OVERPASS_PROXY_PATH` | Override Overpass proxy path (default `/api/overpass`). |
+| `VITE_PHOTON_PROXY_PATH` | Override Photon proxy path (default `/api/photon`). |
 
-**CORS tip:** The value of `Origin` sent by the browser must match an entry in `CORS_ORIGINS` or your `CORS_ORIGIN_REGEX`. Use the exact URL from the address bar (`https://…`), not a path.
+> **CORS:** The browser’s `Origin` must match `CORS_ORIGINS` or `CORS_ORIGIN_REGEX` on the API.
 
 ---
 
@@ -95,35 +156,23 @@ OPENAI_API_KEY=sk-...
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-### 2. Backend
-
-From the **repository root**:
+### 2. Backend (repo root)
 
 ```bash
 python -m venv .venv
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-**Install and run:**
+**Windows (PowerShell):** `.\.venv\Scripts\Activate.ps1`
 
 ```bash
 pip install -r requirements.txt
 python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Prefer **`python -m uvicorn`** over calling the `uvicorn` executable directly if you ever **moved or renamed** the project folder—Windows entry points can still point at an old path.
-
-- **Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Sample call:** `GET /location?name=Eiffel%20Tower` (needs a valid key)
+- Swagger: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- Example: `GET /location?name=Eiffel%20Tower`
 
 ### 3. Frontend
-
-`package.json` lives under **`Frontend/`**. Always install and run scripts from there:
 
 ```bash
 cd Frontend
@@ -131,9 +180,17 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The dev server proxies `/api` to `http://127.0.0.1:8000` (see `Frontend/vite.config.ts`).
+Open [http://localhost:5173](http://localhost:5173).
 
-### Frontend production build (local check)
+**Dev proxies** (`Frontend/vite.config.ts`):
+
+| Prefix | Target |
+|--------|--------|
+| `/api/overpass` | Overpass interpreter |
+| `/api/photon` | Photon Komoot API |
+| `/api` (other) | `http://127.0.0.1:8000` (FastAPI paths without `/api` prefix) |
+
+### Production build (smoke test)
 
 ```bash
 cd Frontend
@@ -141,51 +198,67 @@ npm run build
 npm run preview
 ```
 
-Output is `Frontend/dist/`.
+Output: `Frontend/dist/`.
 
 ---
 
 ## Deploying with GitHub
 
-### Backend on Render
+### API on Render
 
-1. New **Web Service**, connect the repo.
-2. **Root directory:** leave empty (repo root has `requirements.txt` and `Backend/`).
+1. **Web Service** → connect repo.
+2. **Root directory:** empty (repo root has `requirements.txt`).
 3. **Build:** `pip install -r requirements.txt`
 4. **Start:** `uvicorn Backend.main:app --host 0.0.0.0 --port $PORT`
-5. Set **environment variables** (`OPENAI_API_KEY`, `CORS_ORIGINS`, optional `CORS_ORIGIN_REGEX`).
-6. Confirm **Swagger** at `https://<your-service>.onrender.com/docs`.
+5. Env: `OPENAI_API_KEY`, `CORS_ORIGINS`, optional `CORS_ORIGIN_REGEX`.
 
-Free instances may **sleep**; the first request after idle can be slow.
+Free tier may **sleep**; first request after idle can be slow.
 
 ### Frontend on Vercel
 
-The repo supports **either** Vercel root strategy—pick one and align the dashboard.
+Pick **one** root strategy and match the dashboard:
 
-| Vercel “Root Directory” | Config used |
-|-------------------------|-------------|
-| **Empty** (repo root) | Root `vercel.json`: install/build run in `Frontend/`, output `Frontend/dist` |
-| **`Frontend`** | `Frontend/vercel.json` (`npm ci`); framework output is `Frontend/dist` |
+| Vercel root | Config |
+|-------------|--------|
+| **Empty** (repo root) | Root `vercel.json`: build `Frontend/`, output `Frontend/dist`, rewrites for Overpass + Photon |
+| **`Frontend`** | `Frontend/vercel.json` |
 
-1. Import the **same** GitHub repo.
-2. Set **Root Directory** as above (do not mix: the active `vercel.json` must match the folder Vercel treats as the project root).
-3. **Build command / output** are usually auto-filled for Vite; with root `vercel.json` they are explicit.
-4. Add **`VITE_API_BASE_URL`** = your Render URL (no trailing slash), for **Production** (and **Preview** if those builds should hit the same API).
-5. Deploy.
+1. Import repo, set **Root Directory** as above.
+2. Set **`VITE_API_BASE_URL`** for Production (and Preview if needed).
+3. Deploy.
 
-`.vercelignore` reduces upload noise (e.g. `Backend/`, `.venv`).
+`.vercelignore` keeps uploads lean (`Backend/`, `.venv`, etc.).
+
+---
+
+## Map & geodata (frontend)
+
+| Source | Role |
+|--------|------|
+| **CARTO Dark Matter** | Basemap (OSM). |
+| **Overpass** (`overpass-api.de` via `/api/overpass`) | Tourism POIs in view (`attraction`, `museum`, `gallery`, `viewpoint`, `theme_park`, `zoo`). |
+| **Photon** (`photon.komoot.io` via `/api/photon`) | Forward geocoding for the search box. |
+
+**Behavior notes**
+
+- Fetches run from zoom **≥ 11** and only if the viewport bbox is under configured degree limits (reduces timeouts and rate limits).
+- Requests are **debounced**, **aborted** on move, and use **retries with backoff** on 429 / 504 (and related statuses).
+- **Geolocation** uses the browser API; after you **search**, GPS is ignored so a late fix does not jump the map away from your result.
+
+Attribution strings are shown on the map.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Likely cause | What to do |
-|---------|----------------|------------|
-| **Failed to fetch** from the deployed site | Missing/wrong `VITE_API_BASE_URL`, or CORS | Set `VITE_API_BASE_URL` on Vercel and **redeploy**. On Render, set `CORS_ORIGINS` / `CORS_ORIGIN_REGEX` for your real browser origins. |
-| **`npm run dev` / ENOENT package.json** | Ran npm from repo root | `cd Frontend` first. |
-| **Uvicorn “Fatal error in launcher”** after moving the repo | Old venv script paths | Recreate `.venv` or use `python -m uvicorn …`. |
-| **Vercel build exit 126 or endless build** | `node_modules` committed from Windows, or a stray root `package-lock.json` without a root `package.json` | Keep `node_modules/` and `dist/` **gitignored**; commit only `Frontend/package-lock.json`; use the provided `vercel.json` layout. |
-| API works in Swagger but not from the browser | CORS | Origins must match the **exact** scheme + host (and port for localhost). |
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| **Failed to fetch** (deployed) | Missing `VITE_API_BASE_URL` or CORS | Set env on Vercel, redeploy; fix `CORS_*` on API host. |
+| **No pins / Overpass errors** | Rate limits, huge area, or proxy | Zoom in; wait; check `/api/overpass` rewrite in Vercel. |
+| **Search never loads** | Photon proxy / network | Check `/api/photon` rewrite; try another network. |
+| **ENOENT package.json** | Wrong folder | Run npm from **`Frontend/`**. |
+| **Uvicorn launcher error** after moving repo | Stale venv | Recreate `.venv` or use `python -m uvicorn …`. |
+| API OK in Swagger, fails in browser | CORS | Origin must match **exactly** (scheme, host, port). |
 
 ---
 
@@ -195,31 +268,24 @@ The repo supports **either** Vercel root strategy—pick one and align the dashb
 
 | Query | Description |
 |-------|-------------|
-| `name` | Required. Tourist place name (e.g. `Eiffel Tower`). |
+| `name` | Required. Place name (e.g. `Eiffel Tower`). |
 
-**200** — JSON: `summary`, `tourist_rating`, `location_address`, `location_phone`, `parking_availability`, `parking_address` (see `TouristLocationResponse` in `Backend/main.py`).
+**200** — `summary`, `tourist_rating`, `location_address`, `location_phone`, `parking_availability`, `parking_address` (see `TouristLocationResponse` in `Backend/main.py`).
 
-**500** — `OPENAI_API_KEY` missing. **502** — model/upstream or invalid JSON from the model.
-
----
-
-## Map data
-
-Basemap: **CARTO Dark Matter** (OpenStreetMap data). Attribution is shown on the map. Marker positions are defined in `Frontend/src/App.tsx`; swapping in dynamic POIs would be a separate change.
+**500** — `OPENAI_API_KEY` missing. **502** — model / invalid JSON.
 
 ---
 
-## Version 1 (restore point)
+## Branches & version tags
 
-The Git tag **`v1.0.0`** marks **Version 1**: a snapshot of the whole repo at that commit. Your local `.env` and other ignored files are **not** part of Git; only tracked files roll back with the tag.
+| Name | Meaning |
+|------|---------|
+| **`main`** | Default integration branch |
+| **`development`** | Feature work |
+| **`Version_1`** | Branch aligned with `main` at creation (see GitHub); use for snapshots if you prefer a named branch |
+| **Git tag `v1.0.0`** | Restore point for an earlier repo snapshot |
 
-| Goal | Command |
-|------|--------|
-| **Inspect** Version 1 (read-only) | `git switch --detach v1.0.0` |
-| **Branch off** Version 1 to work from it | `git switch -c my-branch-from-v1 v1.0.0` |
-| **Make `development` match Version 1** (discards later commits on that branch) | `git switch development` then `git reset --hard v1.0.0` — then `git push --force-with-lease origin development` only if you intend to rewrite remote history |
-
-After cloning on another machine, fetch tags: `git fetch --tags`, then use `v1.0.0` as above.
+**Inspect tag (read-only):** `git fetch --tags && git switch --detach v1.0.0`
 
 ---
 
