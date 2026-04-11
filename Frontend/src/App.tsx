@@ -34,14 +34,24 @@ async function fetchLocation(name: string): Promise<LocationInfo> {
   const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
   const q = `?name=${encodeURIComponent(name)}`;
   const url = base ? `${base}/location${q}` : `/api/location${q}`;
-  const r = await fetch(url);
-  const j: unknown = await r.json();
+  let r: Response;
+  try {
+    r = await fetch(url);
+  } catch {
+    throw new Error(
+      "Could not reach the API. On Vercel: set VITE_API_BASE_URL to your Render service URL (no trailing slash) and redeploy. On Render: allow this site in CORS (CORS_ORIGINS and/or CORS_ORIGIN_REGEX=https://.*\\.vercel\\.app)."
+    );
+  }
+  const j: unknown = await r.json().catch(() => null);
   if (!r.ok) {
     const msg =
       j && typeof j === "object" && "detail" in j && typeof (j as { detail: unknown }).detail === "string"
         ? (j as { detail: string }).detail
         : "Request failed";
     throw new Error(msg);
+  }
+  if (j === null) {
+    throw new Error("API returned a non-JSON response—check VITE_API_BASE_URL points to your Render API.");
   }
   return j as LocationInfo;
 }

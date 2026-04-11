@@ -12,11 +12,13 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 _cors_raw = os.getenv("CORS_ORIGINS") or ""
 _cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
+_cors_regex = (os.getenv("CORS_ORIGIN_REGEX") or "").strip() or None
 
 app = FastAPI(title="Tourist Expert API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=_cors_regex,
     allow_methods=["*"],
     allow_headers=["*"],
 )
