@@ -5,6 +5,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Overpass has no browser CORS; proxy keeps requests same-origin in dev.
+      "/api/overpass": {
+        target: "https://overpass-api.de",
+        changeOrigin: true,
+        rewrite: () => "/api/interpreter",
+      },
+      "/api/photon": {
+        target: "https://photon.komoot.io",
+        changeOrigin: true,
+        rewrite: (path) => {
+          const q = path.includes("?") ? path.slice(path.indexOf("?")) : "";
+          return `/api/${q}`;
+        },
+      },
       "/api": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,

@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import "leaflet/dist/leaflet.css";
+import {
+  fetchAttractionsInBounds,
+  OSM_ATTRACTION_MIN_ZOOM,
+  type OsmAttraction,
+} from "./overpass";
+import { MapSearch } from "./MapSearch";
 
 const icon = L.icon({
   iconUrl: markerIcon,
@@ -21,14 +27,52 @@ type LocationInfo = {
   parking_address: string;
 };
 
-const SPOTS: { name: string; lat: number; lng: number }[] = [
-  { name: "Eiffel Tower", lat: 48.8584, lng: 2.2945 },
-  { name: "Central Park", lat: 40.7829, lng: -73.9654 },
-  { name: "Colosseum", lat: 41.8902, lng: 12.4922 },
-];
-
 const DARK_TILES =
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
+/** Shown until geolocation succeeds (or permanently if denied / unavailable). */
+const FALLBACK_CENTER: [number, number] = [48.8566, 2.3522];
+const FALLBACK_ZOOM = 12;
+const USER_LOCATION_ZOOM = 12;
+/** Zoom after geocoding a place or address. */
+const SEARCH_RESULT_ZOOM = 14;
+
+type FlyTarget = { lat: number; lng: number; id: number };
+
+function MapFlyTo({ target, zoom }: { target: FlyTarget | null; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target) return;
+    map.setView([target.lat, target.lng], zoom, { animate: true });
+  }, [target, zoom, map]);
+  return null;
+}
+
+function FlyToUserLocation({ geoSkipRef }: { geoSkipRef: MutableRefObject<boolean> }) {
+  const map = useMap();
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    if (!("geolocation" in navigator)) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (geoSkipRef.current) return;
+        const { latitude, longitude } = pos.coords;
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        map.setView([latitude, longitude], USER_LOCATION_ZOOM, { animate: true });
+      },
+      () => {
+        /* keep FALLBACK_CENTER */
+      },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 12_000 }
+    );
+  }, [map]);
+
+  return null;
+}
 
 async function fetchLocation(name: string): Promise<LocationInfo> {
   const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
@@ -76,6 +120,9 @@ function SpotMarker({ name, lat, lng }: { name: string; lat: number; lng: number
         },
       }}
     >
+      <Tooltip direction="top" offset={[0, -36]} opacity={1} className="map-pin-tooltip">
+        {name}
+      </Tooltip>
       <Popup>
         <strong>{name}</strong>
         {loading && <p>Loading…</p>}
@@ -101,6 +148,99 @@ function SpotMarker({ name, lat, lng }: { name: string; lat: number; lng: number
   );
 }
 
+type OsmHint = { text: string | null; loading: boolean };
+
+/** Longer idle window reduces Overpass 429/504 from rapid pan/zoom. */
+const OSM_FETCH_DEBOUNCE_MS = 1400;
+
+function AttractionsFromOsm({ onHint }: { onHint: (h: OsmHint) => void }) {
+  const map = useMap();
+  const [attractions, setAttractions] = useState<OsmAttraction[]>([]);
+  const [hintText, setHintText] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const load = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+
+    const mySeq = ++seqRef.current;
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(async () => {
+      if (mySeq !== seqRef.current) return;
+
+      const z = map.getZoom();
+      if (z < OSM_ATTRACTION_MIN_ZOOM) {
+        setAttractions([]);
+        setHintText(
+          `Zoom to level ${OSM_ATTRACTION_MIN_ZOOM}+ to load tourist places from OpenStreetMap (Overpass).`
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (mySeq !== seqRef.current) return;
+      setHintText(null);
+      setLoading(true);
+
+      const ac = new AbortController();
+      abortRef.current = ac;
+
+      const result = await fetchAttractionsInBounds(map.getBounds(), z, { signal: ac.signal });
+
+      if (mySeq !== seqRef.current) return;
+
+      if (!result.ok) {
+        setLoading(false);
+        if ("aborted" in result && result.aborted) return;
+        if ("error" in result) {
+          setAttractions([]);
+          setHintText(result.error);
+        }
+        return;
+      }
+
+      setLoading(false);
+      setAttractions(result.attractions);
+      if (result.softHint) {
+        setHintText(result.softHint);
+      } else if (result.attractions.length === 0) {
+        setHintText("No OSM tourism tags in this view — pan or zoom.");
+      } else {
+        setHintText(null);
+      }
+    }, OSM_FETCH_DEBOUNCE_MS);
+  }, [map]);
+
+  useMapEvents({
+    moveend: load,
+    zoomend: load,
+  });
+
+  useEffect(() => {
+    load();
+    return () => {
+      abortRef.current?.abort();
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [load]);
+
+  useEffect(() => {
+    onHint({ text: hintText, loading });
+  }, [hintText, loading, onHint]);
+
+  return (
+    <>
+      {attractions.map((a) => (
+        <SpotMarker key={a.key} name={a.name} lat={a.lat} lng={a.lng} />
+      ))}
+    </>
+  );
+}
+
 function MapPinIcon() {
   return (
     <span className="app-header__mark" aria-hidden>
@@ -118,25 +258,52 @@ function MapPinIcon() {
 }
 
 export default function App() {
+  const [osmHint, setOsmHint] = useState<OsmHint>({ text: null, loading: false });
+  const onOsmHint = useCallback((h: OsmHint) => setOsmHint(h), []);
+  const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
+  const geoSkipRef = useRef(false);
+
+  const goToSearchResult = useCallback((lat: number, lng: number) => {
+    geoSkipRef.current = true;
+    setFlyTarget((prev) => ({
+      lat,
+      lng,
+      id: (prev?.id ?? 0) + 1,
+    }));
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
         <MapPinIcon />
         <div className="app-header__titles">
           <h1 className="app-header__name">Tourism Map Search</h1>
-          <p className="app-header__tagline">Click a marker for details from the API</p>
+          <p className="app-header__tagline">
+            Search to jump the map; pins from OpenStreetMap; optional device location; click a marker for API details
+          </p>
         </div>
       </header>
       <main className="map-shell">
-        <MapContainer center={[45, 10]} zoom={3} style={{ height: "100%", width: "100%" }}>
+        <MapSearch className="map-search" onNavigate={goToSearchResult} />
+        <MapContainer
+          center={FALLBACK_CENTER}
+          zoom={FALLBACK_ZOOM}
+          style={{ height: "100%", width: "100%" }}
+        >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            attribution='Places data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (Overpass) · Basemap &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url={DARK_TILES}
           />
-          {SPOTS.map((s) => (
-            <SpotMarker key={s.name} name={s.name} lat={s.lat} lng={s.lng} />
-          ))}
+          <MapFlyTo target={flyTarget} zoom={SEARCH_RESULT_ZOOM} />
+          <FlyToUserLocation geoSkipRef={geoSkipRef} />
+          <AttractionsFromOsm onHint={onOsmHint} />
         </MapContainer>
+        {(osmHint.loading || osmHint.text) && (
+          <div className="map-osm-hint" aria-live="polite">
+            {osmHint.loading && <span>Loading OpenStreetMap places…</span>}
+            {!osmHint.loading && osmHint.text}
+          </div>
+        )}
       </main>
     </div>
   );

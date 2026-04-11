@@ -1,5 +1,15 @@
 {
   "installCommand": "cd Frontend && npm ci --no-audit --no-fund",
   "buildCommand": "cd Frontend && npm run build",
-  "outputDirectory": "Frontend/dist"
+  "outputDirectory": "Frontend/dist",
+  "rewrites": [
+    {
+      "source": "/api/overpass",
+      "destination": "https://overpass-api.de/api/interpreter"
+    },
+    {
+      "source": "/api/photon",
+      "destination": "https://photon.komoot.io/api/"
+    }
+  ]
 }
