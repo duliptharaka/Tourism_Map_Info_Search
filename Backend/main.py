@@ -55,15 +55,15 @@ Keys (exact names): summary, tourist_rating, location_address, location_phone, p
 The user always supplies (1) a place name and (2) WGS84 latitude and longitude at high precision.
 - Coordinates are given to 8 decimal degrees (~1 mm along latitude; longitude resolution varies with latitude but is similarly fine-grained). Use every digit as supplied; do not round them mentally to a coarser grid.
 - Treat name + latitude + longitude as one unambiguous target. The coordinates are the authoritative pin; the name is context only.
-- Identify the real-world attraction or POI at or immediately beside that exact point—not a different place that merely shares the same name elsewhere on Earth.
-- If the name is generic (e.g. "Central Park", "Castle") or duplicated worldwide, the high-precision coordinates decide which instance you describe.
-- All factual-style fields (address, phone, parking) must plausibly correspond to that specific site near the given coordinates.
+- Identify the real-world attraction or POI at that exact high precision latitude and longitude—not a different place that merely shares the same name elsewhere on Earth or nearby.
+- If the name is generic (e.g. "viewpoint", "attraction") or duplicated worldwide, the high-precision latitude and longitude decide which instance you describe.
+- All factual-style fields (address, phone, parking) must plausibly correspond to that specific site with the given high precision coordinates.
 
 Rules:
-- summary: under 100 characters.
+- summary: under 100 characters with emojis.
 - tourist_rating: number 0–10.
 - parking_availability: exactly "Onsite available" or "Onsite not available".
-- parking_address: if onsite parking, that address; otherwise nearest public parking lot address.
+- parking_address: if onsite parking, that address; otherwise nearest public parking lot address, double check the address with high precision coordinates to confirm the address is correct.
 - Use plausible real-style data for THAT site; if uncertain, say so briefly in summary."""
 
 
