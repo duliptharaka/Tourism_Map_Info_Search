@@ -84,14 +84,6 @@ body {
   line-height: 1.2;
 }
 
-.app-header__tagline {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-weight: 450;
-  letter-spacing: 0.01em;
-}
-
 .map-shell {
   flex: 1;
   min-height: 0;

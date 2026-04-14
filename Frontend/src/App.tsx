@@ -277,10 +277,7 @@ export default function App() {
       <header className="app-header">
         <AppLogo />
         <div className="app-header__titles">
-          <h1 className="app-header__name">Tourism Map Search</h1>
-          <p className="app-header__tagline">
-            Search to jump the map; pins from OpenStreetMap; optional device location; click a marker for API details
-          </p>
+          <h1 className="app-header__name">Your Tourism Guide</h1>
         </div>
       </header>
       <main className="map-shell">

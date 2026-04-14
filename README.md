@@ -1,6 +1,6 @@
 <div align="center">
 
-# Tourism Map Search
+# Your Tourism Guide
 
 **Explore the world on a dark map.** Tourist places come from **OpenStreetMap**; tap a pin and your **FastAPI + OpenAI** backend returns structured travel-style details.
 
