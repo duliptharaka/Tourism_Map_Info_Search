@@ -297,4 +297,4 @@ The backend sends **name + coordinates** to the model so homonymous places world
 
 ## License
 
-No license file is included; add one if you distribute the project.
+This project is released under the **MIT License**. See the [`LICENSE`](LICENSE) file in the repository root for the full text.
