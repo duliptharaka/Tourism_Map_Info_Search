@@ -282,7 +282,7 @@ export default function App() {
       <header className="app-header">
         <AppLogo />
         <div className="app-header__titles">
-          <h1 className="app-header__name">Your Tourism Guide</h1>
+          <h1 className="app-header__name">Your Tour Guide</h1>
         </div>
       </header>
       <main className="map-shell">

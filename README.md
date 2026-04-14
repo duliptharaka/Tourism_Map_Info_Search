@@ -1,6 +1,6 @@
 <div align="center">
 
-# Your Tourism Guide
+# Your Tour Guide
 
 **Explore the world on a dark map.** Tourist places come from **OpenStreetMap**; tap a pin and your **FastAPI + OpenAI** backend returns structured travel-style details.
 
