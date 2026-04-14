@@ -75,12 +75,19 @@ function FlyToUserLocation({ geoSkipRef }: { geoSkipRef: MutableRefObject<boolea
   return null;
 }
 
+/** WGS84 query string precision (~1 mm latitude; avoids variable `String(number)` length). */
+const WGS84_DECIMAL_PLACES = 8;
+
+function formatWgs84ForQuery(n: number): string {
+  return n.toFixed(WGS84_DECIMAL_PLACES);
+}
+
 async function fetchLocation(name: string, lat: number, lng: number): Promise<LocationInfo> {
   const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
   const params = new URLSearchParams({
     name,
-    latitude: String(lat),
-    longitude: String(lng),
+    latitude: formatWgs84ForQuery(lat),
+    longitude: formatWgs84ForQuery(lng),
   });
   const q = `?${params.toString()}`;
   const url = base ? `${base}/location${q}` : `/api/location${q}`;

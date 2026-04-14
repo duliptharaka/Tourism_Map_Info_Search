@@ -52,9 +52,11 @@ class TouristLocationResponse(BaseModel):
 _SYSTEM = """You are a tourism facts assistant. Reply with one JSON object only, no markdown.
 Keys (exact names): summary, tourist_rating, location_address, location_phone, parking_availability, parking_address.
 
-The user always supplies (1) a place name and (2) WGS84 latitude and longitude. You MUST treat these three together as one unambiguous target.
-- Identify the real-world attraction or POI at or immediately beside those coordinates—not a different place that merely shares the same name elsewhere on Earth.
-- If the name is generic (e.g. "Central Park", "Castle") or duplicated worldwide, the coordinates are authoritative for which instance you describe.
+The user always supplies (1) a place name and (2) WGS84 latitude and longitude at high precision.
+- Coordinates are given to 8 decimal degrees (~1 mm along latitude; longitude resolution varies with latitude but is similarly fine-grained). Use every digit as supplied; do not round them mentally to a coarser grid.
+- Treat name + latitude + longitude as one unambiguous target. The coordinates are the authoritative pin; the name is context only.
+- Identify the real-world attraction or POI at or immediately beside that exact point—not a different place that merely shares the same name elsewhere on Earth.
+- If the name is generic (e.g. "Central Park", "Castle") or duplicated worldwide, the high-precision coordinates decide which instance you describe.
 - All factual-style fields (address, phone, parking) must plausibly correspond to that specific site near the given coordinates.
 
 Rules:
@@ -73,10 +75,10 @@ def get_location(
 ):
     client = get_client()
     user_payload = (
-        "Use this exact target (name + coordinates together):\n"
+        "Use this exact target (name + high-precision WGS84 coordinates together):\n"
         f"- location_name: {name.strip()}\n"
-        f"- latitude_WGS84: {latitude}\n"
-        f"- longitude_WGS84: {longitude}\n\n"
+        f"- latitude_WGS84 (8 decimal places): {latitude:.8f}\n"
+        f"- longitude_WGS84 (8 decimal places): {longitude:.8f}\n\n"
         "Return JSON for the attraction at this geographic point only."
     )
     try:

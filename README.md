@@ -25,7 +25,7 @@
 | **Pins** | Loaded live from **Overpass API** (tourism tags in the current view). |
 | **Search** | **Photon** geocoder — place names & addresses; map flies to results (top-right panel). |
 | **You** | Optional **browser geolocation** for the initial center (HTTPS / localhost). |
-| **Details** | Click a marker → **`GET /location`** with `name`, `latitude`, `longitude` (WGS84 pin) → OpenAI-structured JSON. |
+| **Details** | Click a marker → **`GET /location`** with `name`, `latitude`, `longitude` — each coordinate is sent as **8 decimal places** (WGS84) for a stable, high-precision pin → OpenAI-structured JSON. |
 
 ---
 
@@ -172,7 +172,7 @@ python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 - Swagger: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- Example: `GET /location?name=Eiffel%20Tower&latitude=48.8584&longitude=2.2945`
+- Example: `GET /location?name=Eiffel%20Tower&latitude=48.85837000&longitude=2.29448000` (client uses **8** fractional digits for `latitude` / `longitude`)
 
 ### 3. Frontend
 
@@ -271,10 +271,10 @@ Attribution strings are shown on the map.
 | Query | Required | Description |
 |-------|:--------:|-------------|
 | `name` | Yes | Place label (e.g. OSM name). |
-| `latitude` | Yes | WGS84 latitude of the map marker (`-90` … `90`). |
-| `longitude` | Yes | WGS84 longitude of the map marker (`-180` … `180`). |
+| `latitude` | Yes | WGS84 latitude of the map marker (`-90` … `90`). The **frontend** sends this with **8 digits** after the decimal point (`toFixed(8)`). |
+| `longitude` | Yes | WGS84 longitude of the map marker (`-180` … `180`). Same **8** fractional digits as `latitude`. |
 
-The backend sends **name + coordinates** to the model so homonymous places worldwide are disambiguated by the pin position.
+The backend forwards **name + high-precision coordinates** to the model: the user message formats latitude and longitude with **8 fractional digits** (Python `.8f`). The system prompt states that these **8 decimal-degree** WGS84 values must be treated as authoritative (no mental rounding), so homonymous places worldwide are disambiguated by the **exact** pin position.
 
 **200** — `summary`, `tourist_rating`, `location_address`, `location_phone`, `parking_availability`, `parking_address` (see `TouristLocationResponse` in `Backend/main.py`).
 
