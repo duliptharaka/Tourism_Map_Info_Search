@@ -10,6 +10,7 @@ import {
   type OsmAttraction,
 } from "./overpass";
 import { MapSearch } from "./MapSearch";
+import logoImg from "../media/logo.png";
 
 const icon = L.icon({
   iconUrl: markerIcon,
@@ -241,18 +242,17 @@ function AttractionsFromOsm({ onHint }: { onHint: (h: OsmHint) => void }) {
   );
 }
 
-function MapPinIcon() {
+function AppLogo() {
   return (
-    <span className="app-header__mark" aria-hidden>
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-        <path
-          d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinejoin="round"
-        />
-        <circle cx="12" cy="11" r="2" fill="currentColor" />
-      </svg>
+    <span className="app-header__logo-wrap">
+      <img
+        src={logoImg}
+        alt=""
+        width={40}
+        height={40}
+        decoding="async"
+        className="app-header__logo"
+      />
     </span>
   );
 }
@@ -275,7 +275,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <MapPinIcon />
+        <AppLogo />
         <div className="app-header__titles">
           <h1 className="app-header__name">Tourism Map Search</h1>
           <p className="app-header__tagline">
