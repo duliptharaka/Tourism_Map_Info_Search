@@ -292,12 +292,30 @@ Numbered release-style branches use **underscores** (e.g. `Version_2`) because G
 | **`development`** | Day-to-day feature work; periodically merged with `main` so both stay aligned |
 | **`Version_1`** | Snapshot branch created from `main` at the Version 1 milestone (see GitHub) |
 | **`Version_2`** | Snapshot branch from `main` at the Version 2 milestone (OSM/Overpass + Photon search, header logo, **`GET /location`** with WGS84 coords for the LLM, **Your Tour Guide**, MIT `LICENSE`) |
-| **Git tag `v1.0.0`** | Older restore point for the repo at that tag |
+| **Git tag `v1.0.0`** | **Restore Point 1** — older snapshot of the tracked tree at that tag |
+| **Git tag `v2.0.0`** | **Restore Point 2** — operational fallback; exact tracked files at commit `b734cd5` (use if later work breaks production) |
 
 **Examples**
 
 - Inspect **tag** `v1.0.0` (detached): `git fetch --tags && git switch --detach v1.0.0`
+- Inspect **Restore Point 2** (`v2.0.0`, detached): `git fetch --tags && git switch --detach v2.0.0`
 - Check out **branch** `Version_2`: `git fetch origin && git switch Version_2`
+
+### Restore Point 2 (`v2.0.0`)
+
+Restore Point 2 is the **annotated Git tag `v2.0.0`**. It points to commit **`b734cd5`** and records the **exact content of every tracked file** in the repository at that moment. If future development causes an operational issue, returning to this tag restores the project directory (as committed in Git) to that known-good state.
+
+**Not included in any tag:** ignored paths such as `.env`, `node_modules/`, virtualenvs, and build output are **not** in Git—re-create or restore those separately (e.g. from your own backups or env docs above).
+
+| Goal | Commands |
+|------|----------|
+| **Look around** (read-only, detached HEAD) | `git fetch --tags` then `git switch --detach v2.0.0` |
+| **Move local `main` back** to Restore Point 2 (drops commits that came after `v2.0.0` on `main` until you merge or cherry-pick again) | `git switch main` → `git fetch origin` → `git reset --hard v2.0.0` |
+| **Branch from Restore Point 2** to fix forward without rewriting `main` yet | `git fetch --tags` → `git switch -c fix-from-restore-point-2 v2.0.0` |
+
+Updating the **remote** default branch to match this tag (e.g. force-moving `origin/main`) rewrites shared history—only do that with team agreement, using e.g. `git push --force-with-lease origin main` after a local `main` reset to `v2.0.0`.
+
+**Restore Point 1** remains available as tag **`v1.0.0`** (same detached / `git reset --hard v1.0.0` pattern).
 
 ---
 
