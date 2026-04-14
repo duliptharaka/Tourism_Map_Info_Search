@@ -284,14 +284,20 @@ The backend sends **name + coordinates** to the model so homonymous places world
 
 ## Branches & version tags
 
+Numbered release-style branches use **underscores** (e.g. `Version_2`) because Git branch names **cannot contain spaces**.
+
 | Name | Meaning |
 |------|---------|
-| **`main`** | Default integration branch |
-| **`development`** | Feature work |
-| **`Version_1`** | Branch aligned with `main` at creation (see GitHub); use for snapshots if you prefer a named branch |
-| **Git tag `v1.0.0`** | Restore point for an earlier repo snapshot |
+| **`main`** | Default integration branch; production-oriented history |
+| **`development`** | Day-to-day feature work; periodically merged with `main` so both stay aligned |
+| **`Version_1`** | Snapshot branch created from `main` at the Version 1 milestone (see GitHub) |
+| **`Version_2`** | Snapshot branch from `main` at the Version 2 milestone (OSM/Overpass + Photon search, header logo, **`GET /location`** with WGS84 coords for the LLM, **Your Tour Guide**, MIT `LICENSE`) |
+| **Git tag `v1.0.0`** | Older restore point for the repo at that tag |
 
-**Inspect tag (read-only):** `git fetch --tags && git switch --detach v1.0.0`
+**Examples**
+
+- Inspect **tag** `v1.0.0` (detached): `git fetch --tags && git switch --detach v1.0.0`
+- Check out **branch** `Version_2`: `git fetch origin && git switch Version_2`
 
 ---
 
