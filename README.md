@@ -23,7 +23,7 @@
 | **Pins** | Loaded live from **Overpass API** (tourism tags in the current view). |
 | **Search** | **Photon** geocoder — place names & addresses; map flies to results (top-right panel). |
 | **You** | Optional **browser geolocation** for the initial center (HTTPS / localhost). |
-| **Details** | Click a marker → **`GET /location?name=…`** → OpenAI-structured JSON. |
+| **Details** | Click a marker → **`GET /location`** with `name`, `latitude`, `longitude` (WGS84 pin) → OpenAI-structured JSON. |
 
 ---
 
@@ -170,7 +170,7 @@ python -m uvicorn Backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 - Swagger: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- Example: `GET /location?name=Eiffel%20Tower`
+- Example: `GET /location?name=Eiffel%20Tower&latitude=48.8584&longitude=2.2945`
 
 ### 3. Frontend
 
@@ -266,9 +266,13 @@ Attribution strings are shown on the map.
 
 ### `GET /location`
 
-| Query | Description |
-|-------|-------------|
-| `name` | Required. Place name (e.g. `Eiffel Tower`). |
+| Query | Required | Description |
+|-------|:--------:|-------------|
+| `name` | Yes | Place label (e.g. OSM name). |
+| `latitude` | Yes | WGS84 latitude of the map marker (`-90` … `90`). |
+| `longitude` | Yes | WGS84 longitude of the map marker (`-180` … `180`). |
+
+The backend sends **name + coordinates** to the model so homonymous places worldwide are disambiguated by the pin position.
 
 **200** — `summary`, `tourist_rating`, `location_address`, `location_phone`, `parking_availability`, `parking_address` (see `TouristLocationResponse` in `Backend/main.py`).
 

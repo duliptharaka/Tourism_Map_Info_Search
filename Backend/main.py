@@ -51,24 +51,41 @@ class TouristLocationResponse(BaseModel):
 
 _SYSTEM = """You are a tourism facts assistant. Reply with one JSON object only, no markdown.
 Keys (exact names): summary, tourist_rating, location_address, location_phone, parking_availability, parking_address.
+
+The user always supplies (1) a place name and (2) WGS84 latitude and longitude. You MUST treat these three together as one unambiguous target.
+- Identify the real-world attraction or POI at or immediately beside those coordinates—not a different place that merely shares the same name elsewhere on Earth.
+- If the name is generic (e.g. "Central Park", "Castle") or duplicated worldwide, the coordinates are authoritative for which instance you describe.
+- All factual-style fields (address, phone, parking) must plausibly correspond to that specific site near the given coordinates.
+
 Rules:
 - summary: under 100 characters.
 - tourist_rating: number 0–10.
 - parking_availability: exactly "Onsite available" or "Onsite not available".
 - parking_address: if onsite parking, that address; otherwise nearest public parking lot address.
-- Use plausible real-style data; if unsure, use best-effort estimates and say so in summary briefly."""
+- Use plausible real-style data for THAT site; if uncertain, say so briefly in summary."""
 
 
 @app.get("/location", response_model=TouristLocationResponse)
-def get_location(name: str = Query(..., min_length=1, description="Tourist location name")):
+def get_location(
+    name: str = Query(..., min_length=1, description="Tourist location name (OSM label or common name)"),
+    latitude: float = Query(..., ge=-90, le=90, description="WGS84 latitude of the map pin"),
+    longitude: float = Query(..., ge=-180, le=180, description="WGS84 longitude of the map pin"),
+):
     client = get_client()
+    user_payload = (
+        "Use this exact target (name + coordinates together):\n"
+        f"- location_name: {name.strip()}\n"
+        f"- latitude_WGS84: {latitude}\n"
+        f"- longitude_WGS84: {longitude}\n\n"
+        "Return JSON for the attraction at this geographic point only."
+    )
     try:
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": f"Tourist location: {name.strip()}"},
+                {"role": "user", "content": user_payload},
             ],
         )
     except Exception as e:

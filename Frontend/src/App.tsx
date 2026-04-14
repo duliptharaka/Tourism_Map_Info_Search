@@ -75,9 +75,14 @@ function FlyToUserLocation({ geoSkipRef }: { geoSkipRef: MutableRefObject<boolea
   return null;
 }
 
-async function fetchLocation(name: string): Promise<LocationInfo> {
+async function fetchLocation(name: string, lat: number, lng: number): Promise<LocationInfo> {
   const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
-  const q = `?name=${encodeURIComponent(name)}`;
+  const params = new URLSearchParams({
+    name,
+    latitude: String(lat),
+    longitude: String(lng),
+  });
+  const q = `?${params.toString()}`;
   const url = base ? `${base}/location${q}` : `/api/location${q}`;
   let r: Response;
   try {
@@ -114,7 +119,7 @@ function SpotMarker({ name, lat, lng }: { name: string; lat: number; lng: number
         click: () => {
           setLoading(true);
           setError(null);
-          fetchLocation(name)
+          fetchLocation(name, lat, lng)
             .then(setData)
             .catch((e: Error) => setError(e.message))
             .finally(() => setLoading(false));
