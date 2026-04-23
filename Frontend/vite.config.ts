@@ -10,6 +10,15 @@ export default defineConfig({
         target: "https://overpass-api.de",
         changeOrigin: true,
         rewrite: () => "/api/interpreter",
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader(
+              "User-Agent",
+              "YourTourGuide/2 (+https://github.com/duliptharaka/Tourism_Map_Info_Search; vite-dev-proxy)"
+            );
+            proxyReq.setHeader("Accept", "application/json");
+          });
+        },
       },
       "/api/photon": {
         target: "https://photon.komoot.io",

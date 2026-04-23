@@ -2,10 +2,6 @@
   "installCommand": "npm ci --no-audit --no-fund",
   "rewrites": [
     {
-      "source": "/api/overpass",
-      "destination": "https://overpass-api.de/api/interpreter"
-    },
-    {
       "source": "/api/photon",
       "destination": "https://photon.komoot.io/api/"
     }

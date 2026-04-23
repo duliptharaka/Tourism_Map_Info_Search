@@ -136,7 +136,10 @@ export async function fetchAttractionsInBounds(
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
         body: `data=${encodeURIComponent(data)}`,
         signal,
       });
