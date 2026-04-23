@@ -267,6 +267,90 @@ body {
   color: #f87171;
 }
 
+/* Popup header: title on the left, weather badge top-right */
+.leaflet-popup-content .popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 14rem;
+}
+
+.leaflet-popup-content .popup-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.popup-weather {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.3rem;
+  border-radius: 0.5rem;
+  background: rgba(61, 156, 240, 0.1);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.popup-weather--loading,
+.popup-weather--error {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.popup-weather--error {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.popup-weather__icon {
+  display: block;
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+.popup-weather__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.popup-weather__temp {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.popup-weather__meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.popup-weather__pop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--accent);
+}
+
+.popup-weather__drop {
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
 /* Hover label on markers */
 .map-shell .leaflet-tooltip.map-pin-tooltip {
   background: #1a1f28;

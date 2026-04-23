@@ -28,6 +28,18 @@ type LocationInfo = {
   parking_address: string;
 };
 
+type WeatherInfo = {
+  condition: string;
+  description: string;
+  icon: string;
+  icon_url: string;
+  is_day: boolean;
+  temp_c: number;
+  temp_min_c: number;
+  temp_max_c: number;
+  precipitation_probability: number;
+};
+
 const DARK_TILES =
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
@@ -82,15 +94,13 @@ function formatWgs84ForQuery(n: number): string {
   return n.toFixed(WGS84_DECIMAL_PLACES);
 }
 
-async function fetchLocation(name: string, lat: number, lng: number): Promise<LocationInfo> {
+function apiUrl(path: string, params: URLSearchParams): string {
   const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
-  const params = new URLSearchParams({
-    name,
-    latitude: formatWgs84ForQuery(lat),
-    longitude: formatWgs84ForQuery(lng),
-  });
   const q = `?${params.toString()}`;
-  const url = base ? `${base}/location${q}` : `/api/location${q}`;
+  return base ? `${base}${path}${q}` : `/api${path}${q}`;
+}
+
+async function getJson<T>(url: string): Promise<T> {
   let r: Response;
   try {
     r = await fetch(url);
@@ -110,13 +120,65 @@ async function fetchLocation(name: string, lat: number, lng: number): Promise<Lo
   if (j === null) {
     throw new Error("API returned a non-JSON response—check VITE_API_BASE_URL points to your Render API.");
   }
-  return j as LocationInfo;
+  return j as T;
+}
+
+function fetchLocation(name: string, lat: number, lng: number): Promise<LocationInfo> {
+  const params = new URLSearchParams({
+    name,
+    latitude: formatWgs84ForQuery(lat),
+    longitude: formatWgs84ForQuery(lng),
+  });
+  return getJson<LocationInfo>(apiUrl("/location", params));
+}
+
+function fetchWeather(lat: number, lng: number): Promise<WeatherInfo> {
+  const params = new URLSearchParams({
+    latitude: formatWgs84ForQuery(lat),
+    longitude: formatWgs84ForQuery(lng),
+  });
+  return getJson<WeatherInfo>(apiUrl("/weather", params));
+}
+
+function WeatherBadge({ weather }: { weather: WeatherInfo }) {
+  return (
+    <div
+      className="popup-weather"
+      title={`${weather.description} · feels like ${Math.round(weather.temp_c)}°C`}
+      aria-label={`Weather: ${weather.description}, ${Math.round(weather.temp_c)} degrees Celsius`}
+    >
+      <img
+        className="popup-weather__icon"
+        src={weather.icon_url}
+        alt={weather.description}
+        width={40}
+        height={40}
+        decoding="async"
+        loading="lazy"
+      />
+      <div className="popup-weather__body">
+        <div className="popup-weather__temp">{Math.round(weather.temp_c)}°C</div>
+        <div className="popup-weather__meta">
+          <span className="popup-weather__hilo">
+            H {Math.round(weather.temp_max_c)}° · L {Math.round(weather.temp_min_c)}°
+          </span>
+          <span className="popup-weather__pop">
+            <span className="popup-weather__drop" aria-hidden="true">💧</span>
+            {Math.round(weather.precipitation_probability)}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SpotMarker({ name, lat, lng }: { name: string; lat: number; lng: number }) {
   const [data, setData] = useState<LocationInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   return (
     <Marker
@@ -130,14 +192,35 @@ function SpotMarker({ name, lat, lng }: { name: string; lat: number; lng: number
             .then(setData)
             .catch((e: Error) => setError(e.message))
             .finally(() => setLoading(false));
+
+          setWeatherLoading(true);
+          setWeatherError(null);
+          fetchWeather(lat, lng)
+            .then(setWeather)
+            .catch((e: Error) => setWeatherError(e.message))
+            .finally(() => setWeatherLoading(false));
         },
       }}
     >
       <Tooltip direction="top" offset={[0, -36]} opacity={1} className="map-pin-tooltip">
         {name}
       </Tooltip>
-      <Popup>
-        <strong>{name}</strong>
+      <Popup className="popup-with-weather">
+        <div className="popup-header">
+          <strong className="popup-title">{name}</strong>
+          {weather && <WeatherBadge weather={weather} />}
+          {!weather && weatherLoading && (
+            <span className="popup-weather popup-weather--loading">…</span>
+          )}
+          {!weather && !weatherLoading && weatherError && (
+            <span
+              className="popup-weather popup-weather--error"
+              title={weatherError}
+            >
+              weather n/a
+            </span>
+          )}
+        </div>
         {loading && <p>Loading…</p>}
         {error && <p className="popup-error">{error}</p>}
         {data && (
