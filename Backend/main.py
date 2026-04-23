@@ -1,7 +1,10 @@
+import asyncio
 import os
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -100,3 +103,100 @@ def get_location(
         return TouristLocationResponse.model_validate_json(raw)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Invalid JSON: {e}") from e
+
+
+class WeatherResponse(BaseModel):
+    condition: str = Field(..., description="Short sky condition group (e.g. Clear, Clouds, Rain).")
+    description: str = Field(..., description="Human-readable description (e.g. 'light rain').")
+    icon: str = Field(..., description="OpenWeather icon code, e.g. '10d' (day) / '10n' (night).")
+    icon_url: str = Field(..., description="Fully qualified PNG URL for the icon.")
+    is_day: bool
+    temp_c: float
+    temp_min_c: float
+    temp_max_c: float
+    precipitation_probability: float = Field(..., ge=0, le=100, description="Max precipitation % in the next ~24h.")
+
+
+OWM_BASE = "https://api.openweathermap.org/data/2.5"
+OWM_ICON_URL = "https://openweathermap.org/img/wn/{icon}@2x.png"
+OWM_TIMEOUT_S = 10.0
+
+
+@app.get("/weather", response_model=WeatherResponse)
+async def get_weather(
+    latitude: float = Query(..., ge=-90, le=90, description="WGS84 latitude of the map pin"),
+    longitude: float = Query(..., ge=-180, le=180, description="WGS84 longitude of the map pin"),
+):
+    key = os.getenv("OPENWEATHER_API_KEY")
+    if not key:
+        raise HTTPException(status_code=500, detail="OPENWEATHER_API_KEY is not set")
+
+    params_common = {"lat": f"{latitude:.8f}", "lon": f"{longitude:.8f}", "units": "metric", "appid": key}
+
+    try:
+        async with httpx.AsyncClient(timeout=OWM_TIMEOUT_S) as client:
+            current_r, forecast_r = await _gather_owm(client, params_common)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"OpenWeather request failed: {e}") from e
+
+    if current_r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"OpenWeather /weather returned {current_r.status_code}: {current_r.text[:200]}")
+
+    current = current_r.json()
+    weather0 = (current.get("weather") or [{}])[0]
+    icon_code = weather0.get("icon") or "01d"
+    condition = weather0.get("main") or "Unknown"
+    description = weather0.get("description") or condition
+    main = current.get("main") or {}
+    temp_c = float(main.get("temp", 0.0))
+    temp_min_c = float(main.get("temp_min", temp_c))
+    temp_max_c = float(main.get("temp_max", temp_c))
+
+    pop_pct = 0.0
+    if forecast_r is not None and forecast_r.status_code == 200:
+        forecast = forecast_r.json()
+        entries = forecast.get("list") or []
+        window = entries[:8] if entries else []
+        temps = [float(e.get("main", {}).get("temp", temp_c)) for e in window]
+        t_mins = [float(e.get("main", {}).get("temp_min", t)) for e, t in zip(window, temps)]
+        t_maxs = [float(e.get("main", {}).get("temp_max", t)) for e, t in zip(window, temps)]
+        pops = [float(e.get("pop", 0.0)) for e in window]
+        if t_mins:
+            temp_min_c = min(temp_min_c, *t_mins)
+        if t_maxs:
+            temp_max_c = max(temp_max_c, *t_maxs)
+        if pops:
+            pop_pct = round(max(pops) * 100.0, 0)
+
+    is_day = icon_code.endswith("d")
+    sys_block = current.get("sys") or {}
+    sunrise = sys_block.get("sunrise")
+    sunset = sys_block.get("sunset")
+    if isinstance(sunrise, (int, float)) and isinstance(sunset, (int, float)):
+        now_s = datetime.now(tz=timezone.utc).timestamp()
+        is_day = bool(sunrise <= now_s < sunset)
+
+    return WeatherResponse(
+        condition=condition,
+        description=description,
+        icon=icon_code,
+        icon_url=OWM_ICON_URL.format(icon=icon_code),
+        is_day=is_day,
+        temp_c=round(temp_c, 1),
+        temp_min_c=round(temp_min_c, 1),
+        temp_max_c=round(temp_max_c, 1),
+        precipitation_probability=pop_pct,
+    )
+
+
+async def _gather_owm(client: httpx.AsyncClient, params: dict):
+    current_r, forecast_r = await asyncio.gather(
+        client.get(f"{OWM_BASE}/weather", params=params),
+        client.get(f"{OWM_BASE}/forecast", params=params),
+        return_exceptions=True,
+    )
+    if isinstance(current_r, BaseException):
+        raise current_r
+    if isinstance(forecast_r, BaseException):
+        forecast_r = None
+    return current_r, forecast_r
